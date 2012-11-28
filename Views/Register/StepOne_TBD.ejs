@@ -1,0 +1,549 @@
+<% include ../header %>
+
+<script type="text/javascript">
+
+var ShoppingMalls=[];
+
+function selectEstablishment(checkbox) {
+ if(checkbox.checked) {
+  $(":checked").not($(checkbox)).removeAttr("checked");
+  $(".businessSelectCheckbox").not($(checkbox)).hide().next("label").hide();
+
+   for(var i=0;i<ShoppingMalls.length;i++) {
+    if(ShoppingMalls[i]._id != checkbox.value) {
+     ShoppingMalls[i].setMap(null);
+    }
+    else {
+     ShoppingMalls[i].setMap(mapHelper.map);
+     $("#claim_name").val(ShoppingMalls[i].name);
+     $("#claim_address").val(ShoppingMalls[i].address);
+    }
+   }
+  }
+  else {
+   $(".businessSelectCheckbox").show().next("label").show();
+   for(var i=0;i<ShoppingMalls.length;i++) {
+    if(ShoppingMalls[i]._id != checkbox.value) {
+     ShoppingMalls[i].setMap(mapHelper.map);
+    }
+   }
+ }
+}
+
+function get_categories(callback) {
+ try {
+  $.getJSON(
+   "http://localhost:3000/categories/business",
+   function(categories) {
+    if(categories) {
+     console.log(categories);
+    }
+   }
+  )
+ }
+ catch(Error) {
+  console.log(Error);
+ }
+}
+
+function get_category(categorySlug, callback) {
+ try {
+  $.getJSON(
+   "http://localhost:3000/category/"+categorySlug,
+   function(category) {
+    if(!category) {
+     $("select[name=businessSubCategorySelect]").html("<option>Choose Your Business Sub-Type</option>").attr("disabled", "disabled");
+    }
+    if(category.slug) {
+     console.log(category);
+     callback(category);
+    }
+   }
+  )
+ }
+ catch(Error) {
+  console.log(Error);
+ }
+}
+
+function doGeocode(address, callback) {
+ $.getJSON(
+  "http://localhost:3000/geo/geocode",
+  {address: address},
+  function(response) {
+   if(response) {
+    callback(response);
+   }
+  }
+ )
+}
+
+function doLoadProgressBar(id, rate) {
+ for(var i=0;i<101;i++) {
+  $("#"+id + " > .progress > .bar").animate({"width":"100%"}, rate);
+ }
+}
+
+function setGeoInfo(level, ID, val) {
+ $("input[name=" + level + "]").val(ID);
+ $("#geo_details_"+level).html("<span style='margin-right: 10px;'> " + val + " </span>");
+}
+
+//Get Shops
+function ShopsAroundMe() {
+ //Remove Listed Businesses
+ $("#list>li").remove();
+
+ //Fetch Businesses Around mapHelper.You
+ $.getJSON(
+  "http://localhost:3000/search/businesses/around_me",
+  {coords:mapHelper.You.coords_str},
+  function(data) {
+
+   //Iterate through response body
+   $.each(data.response.docs, function(key, mall) {
+   console.log(mall);
+    //Set Marker
+    mapHelper.setCustomMarker(new google.maps.LatLng(parseFloat(mall.lng), parseFloat(mall.lat)),null, function(marker) {
+
+     //Add marker attributes for identification
+     marker.setMap(mapHelper.map);
+     marker._id=mall._id;
+     marker.address=mall.formatted_address;
+     marker.name=mall.name
+     //Store in Array
+     ShoppingMalls.push(marker);
+
+    });
+
+    //Repopulate the list
+    $("#list").append($("<li />",{
+     html: "<input type='checkbox' class='businessSelectCheckbox' coords='" + mall.coords + "' address='" + escape(mall.formatted_address) + "' name='claimed_business' onclick='selectEstablishment(this)' value='"+ mall._id + "' style=' margin-right: 5px; float: left;' /> <label> " + mall.name + "</label>"
+    }));
+
+   }); //End $.each
+  } //End Callback
+ ); //End $.getJSON
+}
+
+//Get Malls
+function MallsAroundMe() {
+ //Fetch Shopping Malls Around MapHelper.You
+ $.getJSON(
+   "http://localhost:3000/search/shopping_malls/around_me",
+   {coords:mapHelper.You.coords_str},
+   function(data) {
+
+    //Clear shopping malls from select
+    $("select[name=shoppingCenterSelect]").html("");
+    //Prepend informative option
+    $("select[name=shoppingCenterSelect]").prepend("<option>Are you part of a shopping center?</option>");
+
+    //Array to hold new Options
+    var Options=[];
+    //Iterate through Response Body
+    $.each(data.response.docs, function(key, mall) {
+     //Create Select Options and Append to select
+     $("<option />",{
+      value: mall._id,
+      text: mall.name
+     }).appendTo($("select[name=shoppingCenterSelect]"));
+    });//Ed $.each
+
+   }//End Callback
+ ); //End $.getJSON(../map/location/malls)
+}
+
+function FetchShopsMallsAroundMe() {
+ ShopsAroundMe();
+ MallsAroundMe();
+} //End Fetch Malls
+
+function LoadRegionLabels() {
+ var LoadDiv='<div class="progress progress-striped active" style="width: 50px; float: right;">';
+ LoadDiv+='<div class="bar" style="width: 100%; float: left;"></div>';
+ LoadDiv+='</div>';
+
+ $(".location_details").html(LoadDiv);
+ doLoadProgressBar("geo_details_state");
+ doLoadProgressBar("geo_details_zip"); 
+ doLoadProgressBar("geo_details_county");
+}
+
+function locateAction(showMalls) {
+ LoadRegionLabels();
+ mapHelper.map.setCenter(mapHelper.You.position);
+
+ $.getJSON(
+  "http://localhost:3000/geo/states",
+  function(data) {
+   $.each(data, function(key, val) {
+    var StateID=val.properties.SID;
+    drawShape(val, function(polygon) {
+     if(polygon.containsLatLng(mapHelper.You.position)) {
+      setGeoInfo("state", val._id, val.properties.NAME);
+      polygon.setOptions({
+       fillColor: "#e2e2e2",
+       fillOpacity: 0.0,
+       strokeColor: "#000",
+       map: mapHelper.map
+      });
+
+      mapHelper.You.State = polygon;
+
+      $.getJSON(
+       "http://localhost:3000/geo/counties/in/" + StateID,
+       function(data) {
+       $.each(data, function(key, val) {
+       drawShape(val, function(polygon) {
+
+       //If User Resides in County
+       if(polygon.containsLatLng(mapHelper.You.position)) {
+        setGeoInfo("county", val._id, val.properties.NAME);
+        polygon.setOptions({
+         fillColor: "#003366",
+         fillOpacity: 0.0,
+         strokeColor: "#000",
+         map: mapHelper.map
+        });
+
+        mapHelper.You.County=polygon;
+
+        $.getJSON(
+         "http://localhost:3000/geo/geocode/reverse",
+         {coords: mapHelper.You.coords_str},
+         function(geocoded) {
+          console.log(geocoded);
+          $.getJSON(
+           "http://localhost:3000/geo/zip/"+geocoded,
+           function(zip) {
+            drawShape(zip, function(zipPolygon) {
+             setGeoInfo("zip", zip._id, geocoded);
+             zipPolygon.setOptions({
+              fillColor: "#5EB95E",
+              strokeColor: "#000",
+              fillOpcaity: 0.0,
+              map: mapHelper.map
+             });
+             mapHelper.You.Zip = zipPolygon;
+            });
+                  
+            $("#continue1").removeAttr("disabled");
+           }
+          );
+
+          $("input[name=lat]").val(mapHelper.You.position.lat());
+          $("input[name=lng]").val(mapHelper.You.position.lng());
+
+          if(showMalls) {
+           FetchShopsMallsAroundMe();
+          }
+         }
+        );
+
+       }
+       //EndIf User Resides in County
+      }); //End DrawShape(County)
+      }); //End $.each Counties
+      }//End $.getJSON Counties In State
+     );
+    }//EndIf User Resides in State
+   })//End Draw State Shape
+  });
+ });
+}
+
+
+
+
+$(document).ready(function() {
+ try {
+
+
+ $("form[name=claimBusinessForm]").submit(function(e) {
+  try {
+   $.post(
+    $(this).attr("action"),
+    $(this).serialize(),
+    function(data) {
+     console.log(data)
+    }
+   );
+   e.preventDefault();
+   return false;
+  }
+  catch(Error) {
+   console.log(Error);
+  }
+ });
+
+
+
+
+ $("form[name=createBusinessForm]").submit(function(e) {
+  try {
+   $.post(
+    $(this).attr("action"),
+    $(this).serialize(),
+    function(data) {
+     console.log(data);
+    }
+   );
+   e.preventDefault();
+   return false;
+  }
+  catch(Error) {
+   console.log(Error);
+  }
+ });
+
+  $("#continueCreate").click(function() {
+   try {
+    $.post(
+     "http://localhost:3030/me/setup/step/one",
+     $("form[name=createBusinessForm]").serialize(),
+     function(data) {
+      console.log(data);
+     }
+    )
+   }
+   catch(Error) {
+    console.log(Error);
+   }
+  });
+
+  $("#businessSelectTab > li").click(function() {
+   $("#businessSelectTab > li").removeAttr("class");
+   $(this).attr("class", "active");
+   $("#claimAddPanes > .tab-pane").hide();
+   $("#claimAddPanes > " + $(this).attr("id")).show();
+  });
+
+  $("select[name=businessCategorySelect]").prepend(
+   "<option>Choose Your Business Type</option>"
+  )
+  
+  $.getJSON(
+   "http://localhost:3000/categories/business",
+   function(categories) {
+    if(categories) {
+     for(var i=0;i<categories.length;i++) {
+      $("<option />", {
+       text: categories[i].name,
+       value: categories[i].slug
+      }).appendTo("select[name=businessCategorySelect]");
+     }
+    }
+   }
+  );
+
+
+  function clearMalls() {
+   for(var i=0;i<ShoppingMalls.length;i++) {
+    ShoppingMalls[i].setMap(null);
+   }
+   ShoppingMalls=[];
+  }
+
+  function hideMalls() {
+   for(var i=0;i<ShoppingMalls.length;i++) {
+    ShoppingMalls[i].setMap(null);
+   }
+  }
+
+  function showMalls() {
+   for(var i=0;i<ShoppingMalls.length;i++) {
+    ShoppingMalls[i].setMap(mapHelper.map);
+   }
+  }
+
+  $("#mapWrap").hide();
+  $("#locationPromptShow").show();
+  $("#geo_details_wrap").hide();
+  $("#step2").hide();
+
+
+  $("select[name=businessCategorySelect]").change(function() {
+   get_category($(this).val(), function(category) {
+    var subCategories=category.subcategories;
+    console.log(subCategories);
+    $("select[name=businessSubCategorySelect]").html("");
+    for(var i=0;i<subCategories.length;i++) {
+     $("<option />", {
+      text: subCategories[i]
+     }).appendTo("select[name=businessSubCategorySelect]");
+    }
+    $("select[name=businessSubCategorySelect]").removeAttr("disabled");
+   })
+  });
+
+
+  if (navigator.geolocation) {
+   navigator.geolocation.getCurrentPosition(function(data) {
+
+    $("#locationPromptShow").hide();
+    $("#geo_details_wrap").fadeIn('slow');
+    $("#mapWrap").fadeIn("slow");
+    $("#bar_business").removeAttr("style");
+
+    console.log(data);
+    var map;
+    var mapOptions = {
+     zoom: 14,
+     center: new google.maps.LatLng(37.09024,-95.712891),
+     mapTypeId: google.maps.MapTypeId.ROADMAP,
+     panControl: true,
+     mapTypeControlOptions: {
+      mapTypeIds: [google.maps.MapTypeId.ROADMAP, 'map_style']
+     }
+    };
+
+    map = new google.maps.Map(document.getElementById('map_div'),mapOptions);
+    mapHelper=new gMapsGeo(map);
+    mapHelper.setYou(
+      new google.maps.LatLng(data.coords.latitude, data.coords.longitude),null, function(youMarker) {
+       youMarker.coords_str = data.coords.latitude.toString() + "," + data.coords.longitude.toString();
+       youMarker.setMap(mapHelper.map);
+       mapHelper.map.setCenter(youMarker.position);
+
+
+       google.maps.event.addListener(
+        youMarker,
+        'dragstart',
+        function() {
+
+         mapHelper.You.State.setMap(null);
+         mapHelper.You.County.setMap(null);
+         mapHelper.You.Zip.setMap(null);
+
+         for(var i=0;i<ShoppingMalls.length;i++) {
+          ShoppingMalls[i].setMap(null);
+         }
+
+         ShoppingMalls=[];
+        }
+       );
+
+       google.maps.event.addListener(
+        youMarker,
+        'dragend',
+        function() {
+
+         mapHelper.You.State.setMap(null);
+         mapHelper.You.County.setMap(null);
+         mapHelper.You.Zip.setMap(null);
+
+         mapHelper.You.coords_str = mapHelper.You.position.lat() + "," + mapHelper.You.position.lng();
+         locateAction(true);
+        }
+       );
+      }
+    ); //End mapHelper.setYou()
+
+    locateAction(true);
+
+
+$("#business_address_input").typeahead({
+ source: function(query, process) {
+  return doGeocode(query, function(data) {
+  var returnVals=[];
+   for(var i=0;i<data.results.length;i++) {
+    returnVals.push(data.results[i].formatted_address);
+   }
+   console.log(returnVals);
+   return process(returnVals);
+  });
+ }
+});
+
+$("#business_address_input").change(function() {
+ try { 
+  doGeocode($(this).val(), function(response) {
+   if(response) {
+    mapHelper.You.State.setMap(null);
+    mapHelper.You.County.setMap(null);
+    mapHelper.You.Zip.setMap(null);
+    mapHelper.You.setPosition(new google.maps.LatLng(
+     response.results[0].geometry.location.lat, 
+     response.results[0].geometry.location.lng
+     )
+    );
+    mapHelper.You.coords_str = mapHelper.You.position.lat() + "," + mapHelper.You.position.lng();
+    $("#business_address_input").val(response.results[0].formatted_address);
+    locateAction();
+    clearMalls();
+   }
+   else {
+    console.log("Could not GEOCODE!");
+   }
+  })
+ }
+ catch(Error) {
+  console.log(Error);
+ }
+});
+
+$("#changeLocation").click(function() {
+ mapHelper.You.State.setMap(null);
+ mapHelper.You.County.setMap(null);
+ mapHelper.You.Zip.setMap(null);
+});
+
+$("#back1").click(function() {
+ clearMalls();
+ $("#step2, #step2>*").hide();
+ $("#step2").css("display", "none !important");
+ $("#step1").delay(500).fadeIn("slow");
+});
+
+}, console.log);//End navigator.geolocation.getCurrentPosition
+
+   $("li[rel=create]").click(function() {
+    for(var i=0;i<ShoppingMalls.length;i++) {
+     ShoppingMalls[i].setMap(null);
+    }
+   });
+
+   $("li[rel=claim]").click(function() {
+    for(var i=0;i<ShoppingMalls.length;i++) {
+     ShoppingMalls[i].setMap(mapHelper.map);
+    }
+   });
+
+  }
+ }
+ catch(docReadyError) {
+  console.log(docReadyError);
+ }
+});
+</script>
+
+
+<div class="progress">
+  <div class="bar bar-warning" id="bar_business" style="background: #CCC;">Business Information</div>
+  <div class="bar bar-success" id="bar_profile" style="background: #CCC;">Profile Setup</div>
+</div>
+
+
+
+
+
+
+
+
+
+<style type="text/css">
+.bar {
+ width: 50% !important;
+}
+#list {
+ list-style: none;
+}
+#claimAddPanes {
+ margin-top: -1px; margin-left: auto; border-radius: 0 10px 10px 10px; margin-right: auto; border: 1px solid #ccc; padding: 3px 0 3px 10px;
+}
+
+</style>
+
+
+<% include ../footer %>

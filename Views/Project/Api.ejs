@@ -1,0 +1,191 @@
+<% include ../header_public %>
+
+<div class="container8">
+
+<div class="span3" style="min-height: 100%; display: block;">
+ <ul class="span2 nav nav-list" style="background: #FFF;">
+  <li>
+   <a class="nav-header">Authentication</a>
+   <ul>
+    <li><a href="#">HTTP Basic</a></li>
+    <li><a href="#">OAuth 2.0</a></li>
+   </ul>
+  </li>
+  <li class="nav-header">Objects</li>
+  <ul>
+   <li><a href="#">Profile</a></li>
+   <li><a href="#">Deal</a></li>
+   <li><a href="#">Event</a></li>
+   <li><a href="#">Photo</a></li>
+   <li><a href="#">Video</a></li>
+   <li><a href="#">Stream</a></li>
+   <li><a href="#">Group</a></li>
+   <li><a href="#">Region</a></li>
+   <li><a href="#">Link</a></li>
+   <li><a href="#">Post</a></li>
+  </ul>
+ </ul>
+</div>
+
+
+
+
+
+<div class="span12">
+
+<div class="row-fluid">
+  <div class="span1" style="background: #018dca; border-radius: 50px 0 0 50px;">
+   <h4 style="text-align: center; color: #FFF;">GET</h4>
+  </div>
+  <div class="span9" style="background: #FFF; margin-left: 0;">
+   <h4 style="margin-left: 10px;">https://someapi.com/resource/method</h4>
+   <p class="well well-small">
+    Description, Usage, Gotchas, Fixes, etc...
+   </p>
+  </div>
+</div>
+
+<div class="row-fluid method_wrap">
+  <div class="span1"></div>
+  <div class="span9" style="padding: auto; background: #FFF; margin-left: 0;">
+
+   <div class="span6 request_info_box" style="border: 1px solid #CCC; background: #FFF;">
+    <div class="alert alert-success">Request</div>
+    <div class="span11">
+     <code>
+      <pre>
+       Headers: {
+        Authorization: "username:password",
+        Accepts: "application/json"
+       },
+       Body: null,
+       Headers: {
+        Accepts: "application/json"
+       },
+       Body: {
+        Token: string
+       }
+      </pre>
+     </code>
+    </div>
+   </div>
+   <div class="span6 response_info_box" style="border: 1px solid #CCC; background: #FFF;">
+    <div class="alert alert-warning">Response</div>
+    <div class="span11">
+     <code>
+      <pre>
+       Headers: {
+        Accepts: "application/json"
+       },
+       Body: {
+        Token: string
+       }
+      </pre>
+     </code>
+    </div>
+   </div>
+  </div>
+</div>
+</div>
+
+
+
+
+
+
+
+<div class="span3"></div>
+<div class="span12">
+
+<div class="row-fluid">
+  <div class="span1" style="background: #018dca; border-radius: 50px 0 0 50px;">
+  <h4 style="text-align: center; color: #FFF;">POST</h4>
+  </div>
+  <div class="span9" style="background: #FFF; margin-left: 0;">
+   <h4 style="margin-left: 10px;">https://someapi.com/resource/method</h4>
+   <p class="well well-small">
+    Description, Usage, Gotchas, Fixes, etc...
+   </p>
+  </div>
+</div>
+
+<div class="row-fluid method_wrap">
+  <div class="span1"></div>
+  <div class="span9" style="padding: auto; background: #FFF; margin-left: 0;">
+
+   <div class="span6 request_info_box" style="border: 1px solid #CCC; background: #FFF;">
+    <div class="alert alert-success">Request</div>
+    <div class="span11">
+     <code>
+      <pre>
+       Headers: {
+        Accepts: "application/json"
+       },
+       Body: {
+        Token: string
+       }
+      </pre>
+     </code>
+    </div>
+   </div>
+   <div class="span6 response_info_box" style="border: 1px solid #CCC; background: #FFF;">
+    <div class="alert alert-warning">Response</div>
+    <div class="span11">
+     <code>
+      <pre>
+       Headers: {
+        Accepts: "application/json",
+        Cookies: ["www.buzzbuild.com"]
+       },
+       Body: {
+        Token: string,
+        Param2: string,
+        Param3: string,
+        Count: int
+       }
+      </pre>
+     </code>
+    </div>
+   </div>
+  </div>
+</div>
+</div>
+
+
+
+
+
+
+
+</div>
+
+<script type="text/javascript">
+$(function() {
+
+ //Makes sure that both request/response boxes are equal heights
+ $.each($(".request_info_box"), function(key, val) {
+  if($(val).next(".response_info_box").height() > $(val).height()) {
+   $(val).css("height", $(val).next(".response_info_box").height()+"px");
+  }
+  else {
+   $(val).next(".response_info_box").css("height", $(val).height()+"px");
+  }
+ });
+ //End Equal Height request/response divs
+
+
+
+});
+</script>
+
+<style type="text/css">
+ code, pre {
+  padding-left: 0;
+ }
+ .method_wrap {
+  margin: 0 0 10px 0;
+  border-radius: 0 50px 50px 50px;
+ }
+</style>
+
+<% include ../footer %>

@@ -1,0 +1,80 @@
+<% include ../header %>
+
+<div id="setUpStepOneWrap">
+<ul id="steps" class="nav nav-tabs">
+  <li><a href="#home" data-toggle="tab"><span id="step_one">1</span> Account Type</a></li>
+  <li><a href="#profile" data-toggle="tab"><span id="step_two">2</span> Account Settings</a></li>
+  <li><a href="#messages" data-toggle="tab"><span id="step_three">3</span> Profile Settings</a></li>
+</ul>
+<div class="tab-content">
+  <div class="tab-pane active" id="home">
+  	<img src="<%- user_avatar %>" />
+  	<div class="accountTypeOption">Search</div>
+  	<div class="accountTypeOption">Professional</div>
+  	<div class="accountTypeOption">Business</div>
+  </div>
+  <div class="tab-pane" id="profile">...</div>
+  <div class="tab-pane" id="messages">...</div>
+  <div class="tab-pane" id="settings">...</div>
+</div>
+</div>
+ 
+</body>
+
+<script type="text/javascript">
+$('#steps > li > a').click(function (e) {
+  e.preventDefault();
+  $(".tab-pane").not($($(this).attr("href"))).hide();
+  $($(this).attr("href")).show();
+});
+$("#setUpStepsWrapper > div > span").click(function() {
+
+  $(this).parent('div').animate({
+    opacity: 1,
+    height: '+350',
+    width: '+350'
+  }, 50, function() {
+    // Animation complete.
+  });
+
+});
+</script>
+
+<style type="text/css">
+.accountTypeOption {
+ width: 200px;
+ height: 300px;
+ border: 1px solid #CCC;
+ margin-left: 3px;
+ float: left;
+}
+#step_one {
+ background: #018CCD;
+}
+#step_two {
+ background: #F05829;
+}
+#step_three {
+ background: #76ab1d;
+}
+
+#step_one,
+#step_two,
+#step_three {
+ border-radius: 2px;
+ padding: 2px;
+ color: #FFF;
+ width: 10px;
+ font: 10pt Helvetica, Arial, sans-serif;
+}
+#setUpStepOneWrap {
+ margin: 0 auto;
+ width: 620px;
+}
+#setUpStepsWrapper > div {
+ font: 16pt Helvetica, Arial, sans-serif;
+ background: #e6e6e6;
+ float: left;
+}
+</style>
+</html>

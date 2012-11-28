@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+<!--CDNs-->
+ <!--jQuery CDN-->
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?v=3.exp&sensor=false"></script>
+    <script type="text/javascript" src="http://jzaefferer.github.com/jquery-validation/jquery.validate.js"></script>
+ <!--END jQUERY CDN-->
+ <!--BOOTSTRAP CDN-->
+		<link href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.1.1/css/bootstrap-combined.min.css" rel="stylesheet">
+		<script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.1.1/js/bootstrap.min.js"></script>
+ <!--END BOOTSTRAP CDN-->
+ <!--jQuery Cookie CDN-->
+    <script src="http://cdn.jsdelivr.net/jquery.cookie/1.3/jquery.cookie.js"></script>
+ <!--END jquery Cookie CDN-->
+<!--END CDNs-->
+
+<!--[if lt IE 9]>
+    <script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+<![endif]-->
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  var Socket = io.connect('http://localhost');
+  Socket.on('news', function (data) {
+    console.log(data);
+    Socket.emit('my other event', { my: 'data' });
+  });
+</script>
+
+	  <title>Doczilla</title>
+
+<script type="text/javascript">
+
+function gMapsGeo(mapObj) {
+  //map object
+  this.map = mapObj;
+  this.markers = [];
+  this.customMarkers = [];
+  this.webMarkers = [];
+  this.customMarkersStore = [];
+  this.infoWindows = [];
+  this.clusters = [];
+  this.Circle;
+  this.Instance;
+  this.userMarker;
+  this.Drawer;
+  this.origin;
+  this.You;
+  
+  
+  if (arguments.callee._singletonInstance) {
+   return arguments.callee._singletonInstance;
+  }
+  else {
+   arguments.callee._singletonInstance = this;
+   this.Instance = arguments.callee._singletonInstance;
+  }
+  
+this.Instance.geoCode = function(address, callback) {
+  this.geoHandle.geocode({'address' : address}, function(data, status) {
+    if(status == "OK") {
+    mapObj.setCenter(data[0].geometry.location);
+    this.origin = data[0].geometry.location;
+    callback(data);
+  }
+  });
+}
+
+this.Instance.setYou = function(loc, Icon, callback) {
+ this.Instance.You = new google.maps.Marker({
+  map: this.Instance.map,
+  position: loc,
+  icon: "http://localhost:8080/location.png",
+  draggable: true
+ });
+  
+ this.Instance.You.setAnimation(
+  google.maps.Animation.DROP
+ );
+  
+ if(Icon) {
+  this.Instance.You.setIcon(Icon);
+ }
+
+ callback(this.Instance.You);
+}
+
+this.Instance.clearMarkers = function() {
+ for(var i=0;i < this.markers.length;i++) {
+  this.markers[i].setMap(null);
+ }
+};
+
+this.Instance.setMapCenter = function(loc) {
+  this.map.setCenter(loc);
+};
+
+this.Instance.clearCustomMarkers = function() {
+  for(var i=0;i<this.customMarkers.length;i++) {
+    this.customMarkers[i].setMap(null);
+  }
+};
+
+this.Instance.destroyCustomMarkers = function() {
+  for(var i=0;i<this.customMarkers.length;i++) {
+    this.customMarkers[i].setMap(null);
+    this.customMarkers.pop();
+  }
+  
+  this.customMarkers = [];
+};
+
+this.Instance.getUserMarker = function() {
+  return this.Instance.userMarker;
+};
+
+this.Instance.setCenter = function(lat, lng) {
+  var center = new google.maps.LatLng(
+    parseFloat(lat), 
+    parseFloat(lng)
+  );
+  this.Circle.bindTo('center', center, 'position');
+  this.map.setCenter(center);
+};
+
+this.Instance.drawCircle = function(radius) {
+
+  this.Circle = new google.maps.Circle({
+    map: this.map,
+    radius: radius,
+    fillColor: '#e5e5e5'
+  });
+  this.Circle.bindTo('center', this.Instance.You, 'position');
+};
+
+this.Instance.setRadius = function(val) {
+  //this.drawCircle(val);
+  this.Circle.setRadius(val);
+};
+
+this.Instance.distanceBetweenPoints = function(latlng1, latlng2) {
+  return (
+   (google.maps.geometry.spherical.computeDistanceBetween(latlng1, latlng2) * 0.000621371192237334)
+  );
+};
+
+this.Instance.showMarkers = function(markerArray) {
+  for(var i=0;i<markerArray.length;i++) {
+    markerArray[i].setMap(this.map);
+  }
+};
+
+this.Instance.setCluster = function(clusterArray) {
+  $.each(clusterArray, function(key, val) {
+    console.log(val);
+  });
+};
+
+this.Instance.hideMarkers = function(markerArray) {
+  for(var i=0;i<markerArray.length;i++) {
+    markerArray[i].setMap(null);
+  }
+};
+
+this.Instance.setMarker = function(markerArray, position, Icon) {
+  var Map = this.Instance.map;
+  var infoWindows = this.Instance.infoWindows;
+  var Marker = new google.maps.Marker({
+    map: Map,
+    position: position
+  });
+  
+  Marker.setAnimation(
+   google.maps.Animation.DROP
+  );
+  
+  if(Icon) {
+   Marker.setIcon(
+    Icon
+   );
+  }
+
+  Marker.setDraggable(true);
+  markerArray.push(Marker);
+};
+
+this.Instance.setCustomMarker = function(position, Icon, callback) {
+  var Markers = this.Instance.customMarkers;
+  
+  var Map = this.Instance.map;
+  var infoWindows = this.Instance.infoWindows;
+  var Marker = new google.maps.Marker({
+    map: Map,
+    position: position
+  });
+  
+  Marker.setAnimation(
+   google.maps.Animation.DROP
+  );
+
+  if(Icon) {
+   Marker.setIcon(
+    Icon
+   );
+  }
+  if(!callback) {
+   this.Instance.customMarkers.push(Marker);
+  }
+  else {
+   callback(Marker);
+  }
+};
+
+this.Instance.clearClusters = function() {
+ this.Instance.clusters.setMap(null);
+};
+
+this.Instance.showClusters = function() {
+ this.Instance.clusters.setMap(this.Instance.map);
+};
+
+this.Instance.clusterCustomMarkers = function() {
+ this.Instance.clusters = new MarkerClusterer(
+  this.Instance.map, 
+  this.customMarkers
+ );
+};
+
+this.Instance.createDrawer = function() {
+
+ this.Drawer = new google.maps.drawing.DrawingManager({
+  drawingMode: google.maps.drawing.OverlayType.POLYLINE,
+  drawingControl: false,
+  drawingControlOptions: {
+    drawingModes: [
+     google.maps.drawing.OverlayType.POLYGON, 
+     google.maps.drawing.OverlayType.RECTANGLE,
+     google.maps.drawing.OverlayType.CIRCLE,
+     google.maps.drawing.OverlayType.MARKER
+    ]
+  },
+  polyLineOptions: {
+    draggable: true,
+    editable: true
+  },
+  circleOptions: {
+    fillColor: '#ffff00',
+    fillOpacity: 1,
+    strokeWeight: 5,
+    clickable: false,
+    zIndex: 1,
+    editable: true,
+    draggable: true
+  },
+  markerOptions: {
+   draggable: true
+  }
+});
+this.Drawer.setMap(this.Instance.map);
+this.Drawer.setDrawingMode(null);
+};
+  
+this.Instance.setMarkers = function(geoCodeResponse, clear) {
+  
+  var Markers = this.Instance.markers;
+  var Marker;
+  var Map = this.Instance.map;
+  var infoWindows = this.Instance.infoWindows;
+  var userMarker = this.Instance.userMarker;
+  var circle;
+  
+  $.each(geoCodeResponse, function(key, val) {
+    Marker = new google.maps.Marker({
+    map: Map,
+    position: Map.getCenter(),
+    title: val.name
+  });
+
+  Marker.setAnimation(
+    google.maps.Animation.DROP
+  );
+
+  google.maps.event.addListener(Marker, 'click', function(evt) {
+  
+  var infoWindow = new google.maps.InfoWindow({
+   content: "<h1>You</h1>",                   
+   size: new google.maps.Size(50,50),
+   position: Marker.position
+  });
+  
+  infoWindows.push(infoWindow);
+  infoWindow.open(Map);
+  
+  });
+  Markers.push(Marker);
+ });
+ 
+ this.Instance.userMarker = Marker;
+ this.Instance.markers = Markers;
+
+}
+
+};
+
+
+google.maps.Polygon.prototype.getBounds = function(latLng) {
+ var bounds = new google.maps.LatLngBounds();
+ var paths = this.getPaths();
+ var path;
+ for(var p = 0; p < paths.getLength(); p++) {
+  path = paths.getAt(p);
+  for (var i = 0; i < path.getLength(); i++) {
+   bounds.extend(path.getAt(i));
+  }
+ }
+ return bounds;
+}
+
+google.maps.Marker.prototype.setState = function(state_coords, state_name, state_long_name) {
+ this.state={
+   abbreviation: state_name,
+   coords: state_coords,
+   name: state_long_name
+ }
+}
+
+google.maps.Polygon.prototype.getArea=function(X, Y, numPoints) { 
+  area = 0;         // Accumulates area in the loop
+  j = numPoints-1;  // The last vertex is the 'previous' one to the first
+
+  for (i=0; i<numPoints; i++)
+    { area = area +  (X[j]+X[i]) * (Y[j]-Y[i]); 
+      j = i;  //j is previous vertex to i
+    }
+  return area/2;
+}
+
+// Polygon containsLatLng - method to determine if a latLng is within a polygon
+google.maps.Polygon.prototype.containsLatLng = function(latLng) {
+  // Exclude points outside of bounds as there is no way they are in the poly
+  var bounds = this.getBounds();
+
+  if(bounds != null && !bounds.contains(latLng)) {
+    return false;
+  }
+
+  // Raycast point in polygon method
+  var inPoly = false;
+
+  var numPaths = this.getPaths().getLength();
+  for(var p = 0; p < numPaths; p++) {
+    var path = this.getPaths().getAt(p);
+    var numPoints = path.getLength();
+    var j = numPoints-1;
+
+    for(var i=0; i < numPoints; i++) { 
+      var vertex1 = path.getAt(i);
+      var vertex2 = path.getAt(j);
+
+      if (vertex1.lng() < latLng.lng() && vertex2.lng() >= latLng.lng() || vertex2.lng() < latLng.lng() && vertex1.lng() >= latLng.lng())  {
+        if (vertex1.lat() + (latLng.lng() - vertex1.lng()) / (vertex2.lng() - vertex1.lng()) * (vertex2.lat() - vertex1.lat()) < latLng.lat()) {
+          inPoly = !inPoly;
+        }
+      }
+
+      j = i;
+    }
+  }
+
+  return inPoly;
+}
+
+function drawShape(geo,callback) {
+ switch(geo.geometry.type.toLowerCase()) {
+  case "polygon":
+   return drawSimplePolygon(geo.geometry.coordinates, callback)
+  break;
+  case "multipolygon":
+   return drawMultiPolygon(geo.geometry.coordinates, callback);
+  break;
+  default: 
+   callback(null);
+  break;
+ }
+}
+
+function drawMultiPolygon(coords, callback) {
+    var paths = [];
+    $.each(coords, function (i, n) {
+      $.each(n, function (j, o) {
+        var path = [];
+        $.each(o, function (k, p) {
+          var ll = new google.maps.LatLng(p[1], p[0]);
+          path.push(ll);
+        });
+        paths.push(path);
+      });
+    });
+
+    var poly = new google.maps.Polygon({
+        paths: paths
+    });
+
+    callback(poly);
+}
+
+function drawSimplePolygon(coords, callback) {
+    var paths = [];
+    $.each(coords, function (i, n) {
+      var path = [];
+      $.each(n, function (k, p) {
+       var ll = new google.maps.LatLng(p[1], p[0]);
+       path.push(ll);
+      });
+      paths.push(path);
+    });
+
+    var poly = new google.maps.Polygon({
+        paths: paths
+    });
+    callback(poly);
+}
+
+</script>
+</head>
+<body style="background: #e8e8e8;">
+
+<header>
+<div class="navbar navbar-inverse" style="border-radius: 0 0 10px 10px !important;">
+  <div style="border-radius: 0 !important;" class="navbar-inner">
+   <div class="container">
+    <a class="btn btn-navbar" data-toggle="collapse" data-target=".navbar-responsive-collapse">
+     <span class="icon-bar"></span>
+     <span class="icon-bar"></span>
+     <span class="icon-bar"></span>
+    </a>
+    <a class="brand" style="margin-left: 140px;" href="#"></a>
+    <div class="nav-collapse collapse navbar-responsive-collapse">
+    <ul class="nav pull-right">
+       <li class="dropdown">
+        <a href="#" class="dropdown-toggle" data-toggle="dropdown">Profile</a>
+        <ul class="dropdown-menu">
+          <li><a href="#"><i class="icon icon-home"></i>&nbsp;Home</a></li>
+          <li><a href="#"><i class="icon icon-wrench" style="font-size: 14pt;"></i>&nbsp;Settings</a></li>
+          <li class="divider"></li>
+          <li class="dropdown-submenu">
+           <a tabindex="-1" href="#">Toggle Profiles</a>
+            <ul class="dropdown-menu">
+              <%if(User.profiles){%>
+               <%for(var i=0;i<User.profiles.length;i++){%>
+                <li><a href="#<%-User.profiles[i].slug%>"><%if(User.profiles[i].is_active>0){%><i class="icon icon-ok-sign"></i><%}%><%-User.profiles[i].name%></a></li>
+               <%}%>
+              <%}%>
+            </ul>
+          </li>
+          <li><a href="#"><i class="icon icon-ban-circle"></i>&nbsp;Logout</a></li>
+       </ul>
+      </li>
+    </ul>
+   </div><!-- /.nav-collapse -->
+  </div>
+ </div><!-- /navbar-inner -->
+</div>
+</header>

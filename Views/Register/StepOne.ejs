@@ -1,0 +1,918 @@
+<% include ../header_public %>
+
+<script type="text/javascript">
+
+$(window).bind('hashchange', function() {
+ if(window.location.hash == "#/business") {
+  $("#step2, #step2>*").fadeOut();
+  $("#step1").fadeIn();
+  $('body,html').animate({
+    scrollTop: 0
+  }, 800);
+ }
+ else {
+  $("#step1").fadeOut();
+  $("#step2,#step2>*").fadeIn();
+  $('body,html').animate({
+   scrollTop: 0
+  }, 800);
+ }
+});
+
+
+
+function errorGettingPosition(err) {
+  if(err.code==1)
+  {
+    $("#locationPromptShow").html("Buzzbuild relies on geolocation in order to provide you with relevant information. If you would like to continue with your registration, please refresh this page. Otherwise, click the button below to browse the public portion of this site.");
+  }
+  else if(err.code==2)
+  {
+    $("#locationPromptShow").html("Buzzbuild couldn't find your location. Please try again later.");
+  }
+  else if(err.code==3)
+  {
+    $("#locationPromptShow").html("Buzzbuild's request for information regarding your location has timed out. Please refresh the page to try again.");
+  }
+  else
+  {
+    console.log("ERROR:"+ err.message);
+    $("#locationPromptShow").html("Buzzbuild couldn't find your location. Please try again later.");
+  }
+}
+
+
+$('form').not("form[name=setupStep2]").submit(function(e){
+  try {
+  var Name=$(this).attr("name");
+   $.post(
+    $(this).attr("action"),
+    $(this).serialize(),
+    function(data) {
+     $(this).unbind("submit");
+     return false;
+    }
+   );
+   e.preventDefault();
+   return false;
+  }
+  catch(Error) {
+   console.log(Error);
+  }
+});
+
+var ShoppingMalls=[];
+
+function selectEstablishment(checkbox) {
+ if(checkbox.checked) {
+  $(":checked").not($(checkbox)).removeAttr("checked");
+  $(".businessSelectCheckbox").not($(checkbox)).hide().next("label").hide();
+
+   for(var i=0;i<ShoppingMalls.length;i++) {
+    if(ShoppingMalls[i]._id != checkbox.value) {
+     ShoppingMalls[i].setMap(null);
+    }
+    else {
+     ShoppingMalls[i].setMap(mapHelper.map);
+     $("#claim_name").val(ShoppingMalls[i].name);
+     $("#claim_address").val(ShoppingMalls[i].address);
+    }
+   }
+  }
+  else {
+   $(".businessSelectCheckbox").show().next("label").show();
+   for(var i=0;i<ShoppingMalls.length;i++) {
+    if(ShoppingMalls[i]._id != checkbox.value) {
+     ShoppingMalls[i].setMap(mapHelper.map);
+    }
+   }
+ }
+}
+
+function get_categories(callback) {
+ try {
+  $.getJSON(
+   "http://localhost:3000/categories/business",
+   function(categories) {
+    if(categories) {
+     console.log(categories);
+    }
+   }
+  )
+ }
+ catch(Error) {
+  console.log(Error);
+ }
+}
+
+function get_category(categorySlug, callback) {
+ try {
+  $.getJSON(
+   "http://localhost:3000/category/"+categorySlug,
+   function(category) {
+    if(!category) {
+     $("select[name=business_subcategory]").html("<option>Choose Your Business's Subtype</option>").attr("disabled", "disabled");
+    }
+    if(category.slug) {
+     console.log(category);
+     callback(category);
+    }
+   }
+  )
+ }
+ catch(Error) {
+  console.log(Error);
+ }
+}
+
+function doGeocode(address, callback) {
+ $.getJSON(
+  "http://localhost:3000/geo/geocode",
+  {address: address},
+  function(response) {
+   if(response) {
+    callback(response);
+   }
+  }
+ )
+}
+
+function doLoadProgressBar(id, rate) {
+ for(var i=0;i<101;i++) {
+  $("#"+id + " > .progress > .bar").animate({"width":"100%"}, rate);
+ }
+}
+
+function setGeoInfo(level, ID, val) {
+ $("input[name=" + level + "]").val(ID);
+ $("#geo_details_"+level).html("<span style='margin-right: 10px;'> " + val + " </span>");
+}
+
+//Get Shops
+function ShopsAroundMe() {
+ //Remove Listed Businesses
+ $("#list>li").remove();
+
+ //Fetch Businesses Around mapHelper.You
+ $.getJSON(
+  "http://localhost:3000/search/businesses/around_me",
+  {coords:mapHelper.You.coords_str},
+  function(data) {
+
+   //Iterate through response body
+   $.each(data.response.docs, function(key, mall) {
+   console.log(mall);
+    //Set Marker
+    mapHelper.setCustomMarker(new google.maps.LatLng(parseFloat(mall.lng), parseFloat(mall.lat)),null, function(marker) {
+
+     //Add marker attributes for identification
+     marker.setMap(mapHelper.map);
+     marker._id=mall._id;
+     marker.address=mall.formatted_address;
+     marker.name=mall.name
+     //Store in Array
+     ShoppingMalls.push(marker);
+
+    });
+
+    //Repopulate the list
+    $("#list").append($("<li />",{
+     html: "<input type='checkbox' class='businessSelectCheckbox' coords='" + mall.coords + "' address='" + escape(mall.formatted_address) + "' name='claimed_business' onclick='selectEstablishment(this)' value='"+ mall._id + "' style=' margin-right: 5px; float: left;' /> <label> " + mall.name + "</label>"
+    }));
+
+   }); //End $.each
+  } //End Callback
+ ); //End $.getJSON
+}
+
+//Get Malls
+function MallsAroundMe() {
+ //Fetch Shopping Malls Around MapHelper.You
+ $.getJSON(
+   "http://localhost:3000/search/shopping_malls/around_me",
+   {coords:mapHelper.You.coords_str},
+   function(data) {
+
+    //Clear shopping malls from select
+    $("select[name=shopping_center]").html("");
+    //Prepend informative option
+    $("select[name=shopping_center]").prepend("<option value='null'>Are you part of a shopping center?</option>");
+
+    //Array to hold new Options
+    var Options=[];
+    //Iterate through Response Body
+    $.each(data.response.docs, function(key, mall) {
+     //Create Select Options and Append to select
+     $("<option />",{
+      value: mall._id,
+      text: mall.name
+     }).appendTo($("select[name=shopping_center]"));
+    });//Ed $.each
+
+   }//End Callback
+ ); //End $.getJSON(../map/location/malls)
+}
+
+function FetchShopsMallsAroundMe() {
+ ShopsAroundMe();
+ MallsAroundMe();
+} //End Fetch Malls
+
+function LoadRegionLabels() {
+ var LoadDiv='<div class="progress progress-striped active" style="width: 50px; float: right;">';
+ LoadDiv+='<div class="bar" style="width: 100%; float: left;"></div>';
+ LoadDiv+='</div>';
+
+ $(".location_details").html(LoadDiv);
+ doLoadProgressBar("geo_details_state");
+ doLoadProgressBar("geo_details_zip"); 
+ doLoadProgressBar("geo_details_county");
+}
+
+function locateAction(showMalls) {
+ LoadRegionLabels();
+ mapHelper.map.setCenter(mapHelper.You.position);
+
+ $.getJSON(
+  "http://localhost:3000/geo/states",
+  function(data) {
+   $.each(data, function(key, val) {
+    var StateID=val.properties.SID;
+    drawShape(val, function(polygon) {
+
+     if(polygon.containsLatLng(mapHelper.You.position)) {
+      setGeoInfo("state", val._id, val.properties.NAME);
+      polygon.setOptions({
+       fillColor: "transparent",
+       fillOpacity: 0.1,
+       strokeColor: "#DA4F49",
+       map: mapHelper.map
+      });
+
+      mapHelper.You.State = polygon;
+
+      $.getJSON(
+       "http://localhost:3000/geo/counties/in/" + StateID,
+       function(data) {
+       $.each(data, function(key, val) {
+       drawShape(val, function(polygon) {
+       //If User Resides in County
+       if(polygon.containsLatLng(mapHelper.You.position)) {
+        setGeoInfo("county", val._id, val.properties.NAME);
+        polygon.setOptions({
+         fillColor: "transparent",
+         fillOpacity: 0.1,
+         strokeColor: "#3A87AD",
+         map: mapHelper.map
+        });
+
+        mapHelper.You.County=polygon;
+
+        $.getJSON(
+         "http://localhost:3000/geo/geocode/reverse",
+         {coords: mapHelper.You.coords_str},
+         function(geocoded) {
+          console.log(geocoded);
+          $.getJSON(
+           "http://localhost:3000/geo/zip/"+geocoded,
+           function(zip) {
+            drawShape(zip, function(zipPolygon) {
+             setGeoInfo("zip", zip._id, geocoded);
+             zipPolygon.setOptions({
+              fillColor: "transparent",
+              strokeColor: "#468847",
+              fillOpcaity: 0.1,
+              map: mapHelper.map
+             });
+             mapHelper.You.Zip = zipPolygon;
+            });
+                  
+            $("#continue1").removeAttr("disabled");
+           }
+          );
+
+          $("input[name=lat]").val(mapHelper.You.position.lat());
+          $("input[name=lng]").val(mapHelper.You.position.lng());
+
+          if(showMalls) {
+           FetchShopsMallsAroundMe();
+          }
+         }
+        );
+
+       }
+       //EndIf User Resides in County
+      }); //End DrawShape(County)
+      }); //End $.each Counties
+      }//End $.getJSON Counties In State
+     );
+    }//EndIf User Resides in State
+   })//End Draw State Shape
+  });
+ });
+}
+
+
+function checkSlug(val, callback) {
+ try {
+  $("label[for=slug]").remove();
+  var RegExCheck=new RegExp('/^[a-zA-Z0-9\-]+$/').test(val);
+  if(val.toString().length > 1) {
+   $.getJSON(
+    "http://localhost:3000/profiles/slug/exists",
+    {"slug":val},
+    function(data) {
+    console.log(data.status);
+     if(data.status==true) {
+       $("#continueCreate").attr("disabled", "disabled");
+       $("input[name=slug]").after("<label for='slug' class='help-inline'><i class='icon icon-info-sign'></i>This URL is already taken.</label>");
+       $("input[name=slug]").css("borderColor", "#B94A48");
+       ValidationErrors+=1;
+       if(callback) callback(false);
+     }
+     else {
+      $("input[name=slug]").css("borderColor", "#CCC");
+      $("input[name=slug]").after("<label for='slug' class='help-inline'><i class='icon icon-ok-sign'></i></label>");
+      $("#continueCreate").removeAttr("disabled");
+      if(callback) callback(true);
+     }
+    }
+   );
+  }
+ }
+ catch(Error) {
+  console.log(Error);
+ }
+}
+
+function checkName(val, callback) {
+ try {
+  $("label[for=name]").remove();
+  if(val.toString().length < 1) {
+   $("input[name=name]").not($("#claim_name")).after("<label for='name' class='help-inline'><i class='icon icon-info-sign'></i>Your business name is required.</label>").css("borderColor", "#B94A48");
+   $("#continueCreate").attr("disabled", "disabled");
+   ValidationErrors+=1;
+   if(callback) callback(false);
+  }
+  else {
+   $("input[name=name]").css("borderColor", "#CCC");
+   $("input[name=name]").not($("#claim_name")).after("<label for='name' class='help-inline'><i class='icon icon-ok-sign'></i></label>");
+   $("#continueCreate").removeAttr("disabled");
+   if(callback) callback(true)
+  }
+ }
+ catch(Error) {
+  console.log(Error);
+ }
+}
+
+function checkAddress(val, callback) {
+ try {
+  $("label[for=address]").remove();
+  if(val.toString().length < 1) {
+   $("input[name=address]").not($("#claim_address")).after("<label class='help-inline' for='address'><i class='icon icon-info-sign'></i>Your business address is required.</label>").css("borderColor", "#B94A48");
+   $("#continueCreate").attr("disabled", "disabled");
+   if(callback) callback(false);
+  }
+  else {
+   $("input[name=address]").css("borderColor", "#CCC");
+   $("input[name=address]").not($("#claim_address")).after("<label class='help-inline' for='address'><i class='icon icon-ok-sign'></i></label>")
+   $("#continueCreate").removeAttr("disabled");
+   if(callback) callback(true)
+  }
+ }
+ catch(Error) {
+  console.log(Error);
+ }
+}
+
+function checkBusinessCat(select, callback) {
+ try {
+  $("label[for=business_category]").remove();
+  if(select.options[select.selectedIndex].value == "null") {
+   $(select).after("<label class='help-inline' style='margin-top: 5px;' for='business_category'><i class='icon icon-info-sign'></i>Please Select a Business Type.</label>").css("borderColor", "#B94A48");
+   $("#continueCreate").attr("disabled", "disabled");
+   if(callback) callback(false);
+  }
+  else {
+   $(select).css("borderColor", "#CCC");
+   $(select).after("<label class='help-inline' for='business_category'><i class='icon icon-ok-sign'></i></label>")
+   $("#continueCreate").removeAttr("disabled");
+   if(callback) callback(true);
+  }
+ }
+ catch(Error) {
+  console.log(Error);
+ }
+}
+
+function checkBusinessSubCat(select, callback) {
+ try {
+  console.log(select);
+ }
+ catch(Error) {
+  console.log(Error);
+ }
+}
+
+function BusinessCreateValidation() {
+ try {
+  var Errors=0;
+  checkName($("input[name=name]").not($("#claim_name")).val(), function(rules_satisfied) {
+   if(!rules_satisfied) {
+    Errors+=1;
+   }
+   checkAddress($("input[name=address]").val(), function(rules_satisfied) {
+    if(!rules_satisfied) {
+     Errors+=1;
+    }
+
+    if($("input[name=slug]").val().length > 1) {
+     checkSlug($("input[name=slug]").val(), function(is_taked) {
+      if(is_taken) {
+       Errors+=1;
+      }
+     });
+    }
+      
+    if(Errors > 0) {
+     $("#continueCreate").attr("disabled", "disabled");
+    }
+    return Errors;
+   });
+  })
+ }
+ catch(Error) {
+  return console.log(Error);
+ }
+}
+
+
+$(document).ready(function() {
+ try {
+ var ValidationErrors=0;
+ if(window.location.hash=="#/profile") {
+  window.location.hash="/business";
+ }
+
+ //Check to see if the browser supports HTML5 file API.
+ if(!window.FileReader) {
+  var AppendString= "+Note:+Your+Browser+Does+Not+Support+Image+Previews";
+  var CoverPicImgSrc=$("#uploadCoverPic").attr("src")+AppendString;
+  var ProfilePicImgSrc=$("#uploadProfilePic").attr("src")+AppendString;
+  $("#uploadProfilePic").attr("src", ProfilePicImgSrc);
+  $("#uploadCoverPic").attr("src", CoverPicImgSrc);
+ }
+
+ //Back to Step 1 Button Click Event
+ $("#back1").click(function() {
+  window.location.hash="/business";
+ });
+
+ //Form Submission
+ $("#continueCreate").click(function(e) {
+  try {
+   var Errors=BusinessCreateValidation();
+   alert(Errors);
+   if(ValidationErrors <= 0) {
+    $.post(
+     "http://localhost:3030/me/setup/step/one",
+     $("form[name=createBusinessForm]").serialize(),
+     function(data) {
+      window.location="http://localhost:3030/me";
+     }
+    );
+   }
+   else {
+    $(this).attr("disabled", "disabled");
+    return false;
+   }
+  }
+  catch(Error) {
+   console.log(Error);
+  }
+ });
+
+ //Claim or Create Business Tab Click Event
+ $("#businessSelectTab > li").click(function() {
+  $("#businessSelectTab > li").removeAttr("class");
+  $(this).attr("class", "active");
+  $("#claimAddPanes > .tab-pane").hide();
+  $("#claimAddPanes > " + $(this).attr("id")).show();
+ });
+
+
+ //Prepend this to the business category select input (serves as a label)
+ $("select[name=business_category]").prepend(
+  "<option value='null'>Choose Your Business Type</option>"
+ );
+
+ //Populate business bategory select options
+ $.getJSON(
+  "http://localhost:3000/categories/business",
+  function(categories) {
+   if(categories) {
+    for(var i=0;i<categories.length;i++) {
+     $("<option />", {
+      text: categories[i].name,
+      value: categories[i].slug
+     }).appendTo("select[name=business_category]");
+    }
+   }
+  }
+ );
+
+ function clearMalls() {
+  for(var i=0;i<ShoppingMalls.length;i++) {
+   ShoppingMalls[i].setMap(null);
+  }
+   ShoppingMalls=[];
+ }
+
+  function hideMalls() {
+   for(var i=0;i<ShoppingMalls.length;i++) {
+    ShoppingMalls[i].setMap(null);
+   }
+  }
+
+  function showMalls() {
+   for(var i=0;i<ShoppingMalls.length;i++) {
+    ShoppingMalls[i].setMap(mapHelper.map);
+   }
+  }
+
+  $("#mapWrap").hide();
+  $("#locationPromptShow").show();
+  $("#geo_details_wrap").hide();
+  $("#step2").hide();
+
+
+  $("select[name=business_category]").change(function() {
+   get_category($(this).val(), function(category) {
+    var subCategories=category.subcategories;
+    console.log(subCategories);
+    $("select[name=business_subcategory]").html("");
+    for(var i=0;i<subCategories.length;i++) {
+     $("<option />", {
+      text: subCategories[i]
+     }).appendTo("select[name=business_subcategory]");
+    }
+    $("select[name=business_subcategory]").removeAttr("disabled");
+   })
+  });
+
+
+  if (navigator.geolocation) {
+   navigator.geolocation.getCurrentPosition(function(data) {
+
+    $("#locationPromptShow").hide();
+    $("#geo_details_wrap").fadeIn('slow');
+    $("#mapWrap").fadeIn("slow");
+    $("#bar_business").removeAttr("style");
+
+    console.log(data);
+    var map;
+    var mapOptions = {
+     zoom: 14,
+     center: new google.maps.LatLng(37.09024,-95.712891),
+     mapTypeId: google.maps.MapTypeId.ROADMAP,
+     panControl: true,
+     mapTypeControlOptions: {
+      mapTypeIds: [google.maps.MapTypeId.ROADMAP, 'map_style']
+     }
+    };
+
+    map = new google.maps.Map(document.getElementById('map_div'),mapOptions);
+    mapHelper=new gMapsGeo(map);
+    mapHelper.setYou(
+      new google.maps.LatLng(data.coords.latitude, data.coords.longitude),null, function(youMarker) {
+       youMarker.coords_str = data.coords.latitude.toString() + "," + data.coords.longitude.toString();
+       youMarker.setMap(mapHelper.map);
+       mapHelper.map.setCenter(youMarker.position);
+
+
+       google.maps.event.addListener(
+        youMarker,
+        'dragstart',
+        function() {
+
+         mapHelper.You.State.setMap(null);
+         mapHelper.You.County.setMap(null);
+         mapHelper.You.Zip.setMap(null);
+
+         for(var i=0;i<ShoppingMalls.length;i++) {
+          ShoppingMalls[i].setMap(null);
+         }
+
+         ShoppingMalls=[];
+        }
+       );
+
+       google.maps.event.addListener(
+        youMarker,
+        'dragend',
+        function() {
+
+         mapHelper.You.State.setMap(null);
+         mapHelper.You.County.setMap(null);
+         mapHelper.You.Zip.setMap(null);
+
+         mapHelper.You.coords_str = mapHelper.You.position.lat() + "," + mapHelper.You.position.lng();
+         locateAction(true);
+        }
+       );
+      }
+    ); //End mapHelper.setYou()
+
+locateAction(true);
+
+$("#business_address_input").typeahead({
+ source: function(query, process) {
+  return doGeocode(query, function(data) {
+  var returnVals=[];
+   for(var i=0;i<data.results.length;i++) {
+    returnVals.push(data.results[i].formatted_address);
+   }
+   console.log(returnVals);
+   return process(returnVals);
+  });
+ }
+});
+
+$('#skip2').click(function() {
+ return window.location="/me";
+});
+
+function handleFileSelect(evt) {
+ var imgElementName=(evt.target.id);
+ var files = evt.target.files;
+ var f = files[0];
+ var reader = new FileReader();
+ reader.onload = (function(theFile) {
+  return function(e) {
+   $("img[name=" + imgElementName + "]").attr("src", e.target.result);
+  };
+ })(f);
+ reader.readAsDataURL(f);
+}
+
+$("#uploadCoverPic, #uploadProfilePic").bind('change', handleFileSelect);
+
+$("#business_address_input").change(function() {
+ try { 
+  doGeocode($(this).val(), function(response) {
+   if(response) {
+    mapHelper.You.State.setMap(null);
+    mapHelper.You.County.setMap(null);
+    mapHelper.You.Zip.setMap(null);
+    mapHelper.You.setPosition(new google.maps.LatLng(
+     response.results[0].geometry.location.lat, 
+     response.results[0].geometry.location.lng
+     )
+    );
+    mapHelper.You.coords_str = mapHelper.You.position.lat() + "," + mapHelper.You.position.lng();
+    $("#business_address_input").val(response.results[0].formatted_address);
+    locateAction();
+    clearMalls();
+   }
+   else {
+    console.log("Could not GEOCODE!");
+   }
+  });
+ }
+ catch(Error) {
+  console.log(Error);
+ }
+});
+
+$("#changeLocation").click(function() {
+ mapHelper.You.State.setMap(null);
+ mapHelper.You.County.setMap(null);
+ mapHelper.You.Zip.setMap(null);
+});
+
+}, errorGettingPosition);//End navigator.geolocation.getCurrentPosition
+
+   $("li[rel=create]").click(function() {
+    for(var i=0;i<ShoppingMalls.length;i++) {
+     ShoppingMalls[i].setMap(null);
+    }
+    $("input[name=name]").focus();
+   });
+
+   $("li[rel=claim]").click(function() {
+    for(var i=0;i<ShoppingMalls.length;i++) {
+     ShoppingMalls[i].setMap(mapHelper.map);
+    }
+   });
+
+  }
+ }
+ catch(docReadyError) {
+  console.log(docReadyError);
+ }
+});
+</script>
+
+<div id="locationPromptWrap" style="width: 1060px; margin-left: auto; margin-right: auto;">
+<h1 id="locationPromptShow"style="margin-top: 20%; text-align: center; margin-left: auto; margin-right: auto; display: none;">
+BuzzBuild needs your current location to continue. Please click “Allow” on your browser’s notification bar.
+</h1>
+</div>
+
+<div id="step1">
+<div id="mapWrap" class="well well-large" style="background: #FFF !important; width: 46.5%; height: 1050px; margin-left: auto; margin-right: auto;">
+<div class="progress">
+  <div class="bar bar-warning" id="bar_business" style="height: 30px;background: #CCC;">Business Information</div>
+  <div class="bar bar-success" id="bar_profile" style="background: #CCC;">Profile Setup</div>
+</div>
+<div class="alert alert-success">
+  <button type="button" class="close" data-dismiss="alert">×</button>
+  <strong>The green marker indicates your current location.</strong> If this is not your business location, please drag the map’s green marker to where your business resides.
+</div>
+<p style="float: left;"><strong>Current Region:</strong>&nbsp;&nbsp;</p>
+<p style="float: left;">
+<span class="label label-important"><strong>State</strong>:&nbsp;</span><span class="location_details" id="geo_details_state"></span>
+</p>
+<p style="float: left;">
+<span class="label label-info"><strong>County</strong>:&nbsp;</span><span class="location_details" id="geo_details_county"></span>
+</p>
+<p style="float: left;">
+<span class="label label-success"><strong>Zip Code</strong>:&nbsp;</span><span class="location_details" id="geo_details_zip"></span>
+</p>
+<div id="map_div" class="well well-large" style="width: 92%; height: 285px; margin-left: auto; margin-right: auto; margin-bottom: 15px; border-radius: 10px;"></div>
+
+
+<div id="geo_details_wrap">
+
+
+<div id="business_claim_wrap" style="width: 100%;">
+<ul class="nav nav-tabs" id="businessSelectTab" style="width: 92%;margin-top: 15px; margin-bottom: 0px;">
+  <li style="cursor: pointer;" class="active" rel="claim" id="#claim"><a>Claim a Business</a></li>
+  <li style="cursor: pointer;" rel="create" id="#add"><a>Add Your Business</a></li>
+</ul>
+ 
+<!--BEGIN TAB PANES-->
+<div class="tab-content" style="width: 98%; float: left; padding-top: 10px;" id="claimAddPanes">
+
+<!--START CLAIM PANE-->
+<div class="tab-pane active" id="claim">
+<form name="claimBusinessForm" method="post" action="http://localhost:3030/me/setup/step/one/claim" onsubmit="return false;">
+ <div class="alert alert-info" style="margin-right: 10px;">
+  <button type="button" class="close" data-dismiss="alert">×</button>
+  Claim your business if it appears on the list below. Otherwise, click on "<strong>Add Your Business</strong>".
+ </div>
+
+ <input type="hidden" name="zip" />
+ <input type="hidden" name="state" />
+ <input type="hidden" name="county" />
+ <input type="hidden" name="lat" />
+ <input type="hidden" name="lng" />
+ <input type="hidden" name="is_primary" value="1" />
+ <input type="hidden" id="claim_address" name="address" />
+ <input type="hidden" id="claim_name" name="name" />
+
+ <ul id="list" style="margin-left: 0; padding-left: 0;"></ul>
+ <div class="input-prepend input-append">
+  <span class="add-on">www.buzzbuild.com/#/</span>
+  <input class="input-medium" name="slug" id="appendedPrependedInput" placeholder="Profile URL" type="text">
+ </div><br />
+ <select class="input-xlarge" name="shopping_center"></select><br /><br />
+ <input style="float: left; margin-right: 5px;" type="checkbox" /><label>I have read and agreed to the terms and conditions.</label>
+ <div class="btn-group" style="v-align: bottom; vertical-alig: bottom; float: right; margin: 30px 10px 0 0;">
+  <button id="continueClaim" type="submit" class="btn btn-info">Continue <span class="icon-circle-arrow-right"></span></button>
+ </div>
+</form>
+</div>
+<!-- END CLAIM PANE-->
+
+<!-- START BUSINESS CREATE FORM -->
+<div class="tab-pane" id="add">
+
+  <div class="alert alert-success" style="margin-right: 10px;">
+   <button type="button" class="close" data-dismiss="alert">×</button>
+   Please provide us with your <strong>business information</strong>.
+  </div>
+
+  <form class="form-horizontal" method="post" action="http://localhost:3030/me/setup/step/one" name="createBusinessForm" onsubmit="return false;">
+
+  <input type="hidden" name="zip" />
+  <input type="hidden" name="state" />
+  <input type="hidden" name="county" />
+  <input type="hidden" name="lat" />
+  <input type="hidden" name="lng" />
+  <input type="hidden" name="is_primary" value="1" />
+
+  <input class="input-xlarge" type="text" placeholder="Business Name (Required)" name="name" onblur="checkName(this.value)" /><br /><br />
+  <input class="input-xlarge" id="business_address_input" type="text" placeholder="Business Address (Required)" name="address" onblur="checkAddress(this.value)" /><br /><br />
+
+  <div id="slugInputPrepend" class="input-prepend input-append">
+   <span class="add-on">www.buzzbuild.com/#/</span>
+   <input class="input-medium" name="slug" id="appendedPrependedInput" placeholder="Profile URL" onblur="checkSlug(this.value);" type="text">
+  </div><br /><br />
+
+  <select style="margin-bottom:-20px" class="input-xlarge" name="business_category" onchange="checkBusinessCat(this);"></select><br /><br /><br />
+  <select class="input-xlarge" name="business_subcategory" disabled="disabled" onchange="checkBusinessSubCat(this);">
+  <option value="null">Choose Your business's sub-type</option>
+  </select><br /><br />
+  <select class="input-xlarge" name="shopping_center"></select><br /><br />
+  <input style="float: left; margin-right: 5px;" type="checkbox" /><label>I have read and agreed to the terms and conditions.</label>
+  <div class="btn-group" style="v-align: bottom; vertical-alig: bottom; float: right; margin: 30px 10px 0 0;">
+   <button id="continueCreate" type="submit" class="btn btn-info">Continue <span class="icon-circle-arrow-right"></span></button>
+  </div>
+  </form>
+</div>
+<!-- End Business Create Form -->
+
+</div>
+<!--END TAB PANES -->
+</div>
+</div>
+</div>
+</div>
+
+<div id="step2">
+<div id="mapWrap" class="well well-large" style="background: #FFF !important; width: 46.5%; height: 850px; margin-left: auto; margin-right: auto;">
+<div class="btn-group" style="">
+ <button id="back1" type="submit" class="btn btn-danger">&nbsp;<span class="icon-circle-arrow-left"></span>Back</button>
+ <button id="skip2" type="submit" class="btn btn-info">Skip<span class="icon-circle-arrow-right"></span></button>
+</div>
+<br />
+<div class="progress">
+  <div class="bar bar-warning" id="bar_business" style="height: 30px;">Business Information</div>
+  <div class="bar bar-success" id="bar_profile">Profile Setup</div>
+</div>
+<br />
+<form name="setupStep2" method="post" enctype="multipart/form-data" action="http://localhost:3030/me/setup/step/two/">
+
+<div class="well well-small">
+<div class="alert alert-success" style="">
+ <button style="border-radius: 150px;" type="button" class="close" data-dismiss="alert">×</button>
+ <strong>Profile Pictures</strong>
+</div>
+
+<ul class="thumbnails">
+  <li class="span3">
+    <div class="thumbnail">
+      <img class="imgPreview pull-left" name="uploadProfilePic" src="http://placehold.it/300x200&text=150X150+pixels" alt="">
+      <div class="caption">
+       <p>Profile Picture</p>
+       <p class="upload"><input type="file" id="uploadProfilePic" name="profile_photo"/></p>
+      </div>
+     </div>
+    </li>
+    <li class="span3">
+    <div class="thumbnail">
+     <img class="imgPreview pull-right" name="uploadCoverPic" src="http://placehold.it/300+x+200&text=700X300+pixels" alt="">
+     <div class="caption">
+      <p>Profile Cover Photo</p>
+      <p class="upload"><input type="file" id="uploadCoverPic" name="cover_photo"/></p>
+    </div>
+  </div>
+ </li>
+</ul>
+</div>
+
+
+
+
+
+<div class="well well-small">
+<div class="alert alert-info" style="">
+ <button type="button" class="close" data-dismiss="alert">×</button>
+ Your <strong>Business Spotlight</strong> allows you to describe your business.
+</div>
+
+<input class="input-xxlarge" id="business_address_input" type="text" placeholder="Spotlight Title" name="spotlight_title" />
+
+<textarea rows="3" style="width: 98%; margin-right: 10px;" name="spotlight_short" placeholder="Short Business Description"></textarea>
+<textarea rows="3" style="width: 98%; margin-right: 10px;" name="spotlight_long" placeholder="Long Business Description"></textarea>
+
+</div>
+
+<div class="btn-group pull-right" style="">
+ <button id="back1" type="submit" class="btn btn-success">Start&nbsp;<span class="icon-circle-arrow-right"></span></button>
+</div>
+
+</form>
+</div>
+</div>
+
+
+<style type="text/css">
+.bar {
+ width: 50% !important;
+}
+#list {
+ list-style: none;
+}
+#claimAddPanes {
+ margin-top: -1px; margin-left: auto; border-radius: 0 10px 10px 10px; margin-right: auto; border: 1px solid #ccc; padding: 3px 0 3px 10px;
+}
+.well {
+ background: #FFF;
+}
+</style>
+
+
+<% include ../footer %>

@@ -1,0 +1,194 @@
+<% include header_public %>
+
+<div class="" id="loginFormWrap">
+  <div id="loginFormTop">
+  	<img src="http://localhost:8080/brazzlebox.png" />
+  </div>
+  <% if(errors) { %><div class="alert"><button type="button" class="close" data-dismiss="alert" onclick="return LoginForm.Close.Warning()">×</button><%-errors%></div></i></a></p><%}%>
+  <button type="button" id="toggle_form" class="btn btn-info">Register</button>
+  <span class='social_icon_set'>
+   <a href="http://localhost:3030/login/facebook/"><img src="http://localhost:8080/facebook.png" /></a>
+   <a href="http://localhost:3030/login/twitter/"><img src="http://localhost:8080/twitter.png" /></a>
+   <a href="http://localhost:3030/login/linkedin/"><img src="http://localhost:8080/linkedin.png" /></a>
+   <a href="http://localhost:3030/login/google/"><img src="http://localhost:8080/google.png" /></a>
+  </span>
+  <br />
+  <br />
+  <div id="login" class="auth_form_toggle">
+   <% include forms/login %>
+  </div>
+  <div id="register" class="auth_form_toggle">
+   <% include forms/register %>
+  </div>
+</div>
+
+<script type="text/javascript">
+
+var LoginForm = {
+
+ Close: {
+  Warning: function() {
+   $(".alert").slideUp();
+  }
+ },
+ 
+ load_login_form: function(callback) {
+  try {
+  	$.get(
+  	 'http://localhost:3000/forms/login',
+  	 function(data) {
+  	  callback(data);
+  	  return false;
+  	 }
+  	);
+  }
+  catch(err) {
+   console.log(err);
+  }
+ },
+
+ load_registration_form: function(callback) {
+  try {
+  	$.get(
+  	 'http://localhost:3000/forms/register',
+  	 function(data) {
+  	  callback(data);
+  	  return false;
+  	 }
+  	);
+  }
+  catch(err) {
+  	console.log(err);
+  }
+ },
+
+ toggle: function(val) {
+  switch(val) {
+   case "register":
+    $("#login").hide();
+    $("#register").fadeIn("slow");
+    $("#loginFormWrap").css("background", "#f05829");
+    $("#toggle_form").css("background", "#018ccd");
+    $("#toggle_form").text("Login");
+   break;
+   default:
+    $("#login").fadeIn("slow");
+    $("#register").hide();
+    $("#loginFormWrap").css("background", "#018ccd");
+    $("#toggle_form").css("background", "#f05829");
+    $("#toggle_form").text("Register");
+   break;
+  }
+ },
+
+ Error: {
+  Form: function(errStr) {
+   $("#login_register_form_error").html("");
+   $("#login_register_form_error").css("display", "block");
+   $("#login_register_form_error").html(errStr).delay(2500).slideUp();
+  }
+ }
+}
+
+$("#toggle_form").click(function() {
+ $(".alert").hide();
+ LoginForm.toggle($(this).text().toLowerCase());
+});
+$(document).ready(function() {
+ LoginForm.toggle("<%- show %>");
+});
+
+</script>
+
+<style type="text/css">
+
+.btn {
+text-align: center;
+font-size: 15px;
+font-weight: bold;
+}
+
+.social_icon_set {
+ float: right;
+ margin-right: 60px;
+}
+.social_media_oauth_tray {
+ margin: 5px auto;
+}
+
+#toggle_form {
+ margin-left: 62px;
+}
+#btn_login, 
+#btn_register,
+button[name=cancel] {
+ background: #000;
+}
+button > a {
+ color: #FFF;
+}
+#loginFormWrap {
+ margin: 100px auto;
+ padding: 0 auto 15px auto;
+ width: 400px;
+ background: #028cca;
+ border-radius: 25px;
+ opacity: 0.9;
+ padding-bottom: 10px;
+ min-height: 300px;
+}
+#loginFormWrap > div > img {
+ margin: 0 auto auto 50px;
+}
+#loginFormTop {
+ padding: 0 auto;
+ background: #000;
+ margin-bottom: 15px;
+ border-radius: 25px 25px 0 0;
+}
+#loginFormWrap > div > form > div {
+ margin:0 auto;
+ width: 275px;
+}
+#loginFormWrap > div > form > div > input[type=text],
+#loginFormWrap > div > form > div > input[type=password] {
+ width: 265px;
+ height: 30px;
+ background: #FFF !important;
+ border-radius: 5px;
+}
+#loginServicesTray {
+ margin-top: 10px;
+}
+#loginFormWrap > div > form > div > div > p {
+ font: 10pt Helvetica, Arial, sans-serif;
+ color: #e8e8e8;
+ padding: 0;
+ margin: 0;
+}
+#loginFormWrap > div > form > div > button {
+ height: 30px;
+}
+
+#login_register_form_error {
+ font-weight: bold;
+ margin-left: auto;
+ margin-right: auto;
+ max-width: 300px;
+ padding: 5px;
+ background: #FFF;
+ text-align:center;
+ border-radius: 3px;
+}
+
+.alert {
+ width: 285px;
+ margin-left: auto;
+ margin-right: auto;
+}
+</style>
+
+
+<% include footer %>
+
+
